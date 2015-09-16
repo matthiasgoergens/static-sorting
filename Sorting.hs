@@ -1,4 +1,6 @@
+{-# LANGUAGE LambdaCase #-}
 import qualified Data.ByteString.Lazy as B
+import System.IO
 import Control.Arrow
 import Control.Monad.Writer.Strict
 import Codec.Picture
@@ -19,17 +21,22 @@ image set = ImageYF $ generateImage f size size where
 --          * (cos (fromIntegral y / 30) / 2 + 0.5)
 
 
-size = 1000
+size = 2000
 
 list :: IO [Float]
 list = replicateM size (randomIO :: IO Float)
 
-le :: Ord a => a -> a -> Writer [(a, a)] Bool
+le :: Ord a => a -> a -> Writer (DS.Set (a, a)) Bool
 le x y = do
-    tell [(x, y)]
+    tell $ DS.singleton (x, y)
     return (x < y)
 
-qsort :: Ord a => [a] -> Writer [(a, a)] [a]
+cmp :: Ord a => a -> a -> Writer (DS.Set (a, a)) Ordering
+cmp x y = do
+    tell $ DS.singleton (x, y)
+    return $ compare x y
+
+qsort :: Ord a => [a] -> Writer (DS.Set (a, a)) [a]
 qsort [] = return []
 qsort (x:xs) = do
     cmp <- mapM (le x) xs
@@ -40,15 +47,50 @@ qsort (x:xs) = do
     r <- qsort hi
     return $ l ++ [x] ++ r
 
+merge :: Ord a => [a] -> [a] -> Writer (DS.Set (a, a)) [a]
+merge [] r = return r
+merge l [] = return l
+merge (l:ls) (r:rs) = cmp l r >>= \case
+    LT -> (l:) <$> merge ls (r:rs)
+    EQ -> ([l, r] ++) <$> merge ls rs
+    GT -> (r:) <$> merge (l:ls) rs
+
+msort :: Ord a => [a] -> Writer (DS.Set (a, a)) [a]
+msort [] = return []
+msort [x] = return [x]
+msort l = iter (map return l) where
+    pair (x:y:xs) = do
+        (:) <$> merge x y <*> pair xs
+    pair l = return l
+
+    iter [] = return []
+    iter [x] = return x
+    iter l = iter =<< pair l
+
+
 shuffle :: [Float] -> [Int]
 shuffle l = map snd $ sort $ zip l [0..]
 
 main = do
-    l <- list
-    let ll = shuffle l
-        ll' = zip ll [0..]
-        w :: DS.Set (Int, Int)
-        w = DS.map (snd***snd) $ DS.fromList $ execWriter $ qsort ll
-    B.putStr $ imageToPng (image w)
+    l <- shuffle <$> list
+    let perSort sortName sort l = do
+            let q :: DS.Set (Int, Int)
+                q = execWriter $ sort l
+                fname = sortName ++ show size ++ ".png"
+            putStrLn fname
+            withFile fname WriteMode $ \h -> B.hPutStr h $ imageToPng (image q)
+    let perSortOrig sortName sort l = do
+            let q :: DS.Set (Int, Int)
+                q = DS.map (snd *** snd) $ execWriter $ sort $ zip l [0..]
+                fname = sortName ++ "Orig" ++ show size ++ ".png"
+            putStrLn fname
+            withFile fname WriteMode $ \h -> B.hPutStr h $ imageToPng (image q)
+
+    -- perSort "qsort" qsort l
+    perSort "msort" msort l
+    perSortOrig "msort" msort l
+    perSort "qsort" qsort l
+    perSortOrig "qsort" qsort l
+    -- perSort "msortRevSorted" msort $ reverse [0..size-1]
     -- print w
     -- B.putStr $ imageToPng $ image $ DS.fromList [(200, 100), (100, 100)]
