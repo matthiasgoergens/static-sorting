@@ -16,19 +16,14 @@
 > import Data.List (sort, uncons)
 > import Debug.Trace
 
-> image :: DS.Set (Int, Int) ->  DynamicImage
-> image set = ImageYF $ generateImage f size size where
+> image :: Int -> DS.Set (Int, Int) ->  DynamicImage
+> image size set = ImageYF $ generateImage f size size where
 >     f x y | DS.member (x, y) set = 0.0
 >           -- | DS.member (y, x) set = 0.9
 >           | otherwise = 1.0
 > --    f x y = (sin (fromIntegral x / 20) / 2 + 0.5)
 > --          * (cos (fromIntegral y / 30) / 2 + 0.5)
 
-
-> size = 2000
-
-> list :: IO [Float]
-> list = replicateM size (randomIO :: IO Float)
 
 > le :: Ord a => a -> a -> Writer (DS.Set (a, a)) Bool
 > le x y = do
@@ -109,8 +104,5 @@
 >     Nothing -> return []
 >     Just (x, xs) -> (x:) <$> selSort xs
 
-
-> shuffle :: [Float] -> [Int]
-> shuffle l = map snd $ sort $ zip l [0..]
 
      -- B.putStr $ imageToPng $ image $ DS.fromList [(200, 100), (100, 100)]

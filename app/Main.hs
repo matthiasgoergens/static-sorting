@@ -11,18 +11,57 @@ import Control.Monad.Writer.Strict
 
 import qualified Data.ByteString.Lazy as B
 import Data.Foldable (foldrM)
+import Data.Hashable
 import Data.List (sort, uncons)
+import Data.List.Extra (splitOn)
 import qualified Data.Set as DS
 
 import Debug.Trace
 
 import Development.Shake
+import Development.Shake.FilePath
 
 import System.IO
 import System.Random
+import System.Random.Shuffle
 
 import Sorting
 
+type Seed = Int
+
+inputList :: Seed -> Int -> [Int]
+inputList seed size = shuffle' [0..size-1] size (mkStdGen seed)
+
+whichAlgo :: Ord a => String -> ([a] -> Writer (DS.Set (a, a)) [a])
+whichAlgo = \case
+  "insertion" -> isort
+  "quick" -> qsort'
+  "merge" -> msort
+  "selection" -> selSort
+  x -> error $ "Don't know about algorithm: " ++ x
+presentation = \case
+  "xy" -> (fst *** fst)
+  "Xy" -> (snd *** fst)
+  "xY" -> (fst *** snd)
+  "XY" -> (snd *** snd)
+  x -> error $ "Don't know about axes: " ++ x
+
+main = shakeArgs shakeOptions $ do
+  -- TODO: get Shake's FilePattern module.
+  "images/*_*_*_*.png" %> \filename -> do
+    let [whichAlgo -> algo, input, presentation -> options, read -> size]
+          = splitOn "_" $ takeFileName $ dropExtension filename
+    l <- case input of
+        "presorted" -> return [0..size-1]
+        "random" -> do
+          seed <- hash <$> readFile' "seed"
+          return $ inputList seed size
+    -- Consider switching to Data.Sequence for the writer.
+    let comparisons = DS.map options $ execWriter $ algo (zip l [0..])
+
+    traced ("Writing image: " ++ filename) $ withFile filename WriteMode $ \h -> B.hPutStr h $ imageToPng (image size comparisons)
+
+{-
 main = do
     (l :: [Int]) <- shuffle <$> list
     let perSort sortName fname' f q' = do
@@ -63,4 +102,4 @@ main = do
 --    perSortOrig "insert" isort l
 --    perSort "insert" isort l
     -- print w
-
+-}
