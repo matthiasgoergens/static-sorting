@@ -13,7 +13,7 @@ import qualified Data.ByteString.Lazy as B
 import Data.Foldable (foldrM)
 import Data.Hashable
 import Data.List (sort, uncons)
-import Data.List.Extra (splitOn)
+import Data.List.Extra (splitOn, trim)
 import qualified Data.Set as DS
 
 import Debug.Trace
@@ -48,6 +48,8 @@ presentation = \case
 
 main = shakeArgs shakeOptions $ do
   -- TODO: get Shake's FilePattern module.
+  action $ do
+    need . filter (not . null) . map trim =<< readFileLines "list"
   "images/*_*_*_*.png" %> \filename -> do
     let [whichAlgo -> algo, input, presentation -> options, read -> size]
           = splitOn "_" $ takeFileName $ dropExtension filename
