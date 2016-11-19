@@ -34,7 +34,7 @@ inputList seed size = shuffle' [0..size-1] size (mkStdGen seed)
 
 whichAlgo :: Ord a => String -> ([a] -> Writer (DS.Set (a, a)) [a])
 whichAlgo = \case
-  "insertion" -> isort
+  "insert" -> isort
   "quick" -> qsort'
   "merge" -> msort
   "selection" -> selSort
