@@ -41,9 +41,9 @@ whichAlgo = \case
   x -> error $ "Don't know about algorithm: " ++ x
 presentation = \case
   "xy" -> (fst *** fst)
-  "Xy" -> (snd *** fst)
-  "xY" -> (fst *** snd)
-  "XY" -> (snd *** snd)
+  "-y" -> (snd *** fst)
+  "x-" -> (fst *** snd)
+  "--" -> (snd *** snd)
   x -> error $ "Don't know about axes: " ++ x
 
 main = shakeArgs shakeOptions $ do
