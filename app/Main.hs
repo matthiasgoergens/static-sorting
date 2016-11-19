@@ -46,7 +46,7 @@ presentation = \case
   "--" -> (snd *** snd)
   x -> error $ "Don't know about axes: " ++ x
 
-main = shakeArgs shakeOptions $ do
+main = shakeArgs shakeOptions { shakeThreads = 0, shakeChange = ChangeModtimeAndDigestInput } $ do
   -- TODO: get Shake's FilePattern module.
   action $ do
     need . filter (not . null) . map trim =<< readFileLines "list"
