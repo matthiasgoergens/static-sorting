@@ -59,7 +59,7 @@ main = shakeArgs shakeOptions $ do
     -- Consider switching to Data.Sequence for the writer.
     let comparisons = DS.map options $ execWriter $ algo (zip l [0..])
 
-    traced ("Writing image: " ++ filename) $ withFile filename WriteMode $ \h -> B.hPutStr h $ imageToPng (image size comparisons)
+    traced ("Writing image") $ withFile filename WriteMode $ \h -> B.hPutStr h $ imageToPng (image size comparisons)
 
 {-
 main = do
