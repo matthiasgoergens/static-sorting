@@ -2,20 +2,24 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Main where
-import qualified Data.ByteString.Lazy as B
-import Data.Foldable (foldrM)
-import System.IO
-import Control.Arrow
-import Control.Monad.Writer.Strict
 import Codec.Picture
 import Codec.Picture.Saving
-import Control.Monad
 
-import System.Random
-import qualified Data.Set as DS
+import Control.Arrow
+import Control.Monad
+import Control.Monad.Writer.Strict
+
+import qualified Data.ByteString.Lazy as B
+import Data.Foldable (foldrM)
 import Data.List (sort, uncons)
+import qualified Data.Set as DS
+
 import Debug.Trace
 
+import Development.Shake
+
+import System.IO
+import System.Random
 
 import Sorting
 
