@@ -1,7 +1,12 @@
 > {-# LANGUAGE LambdaCase #-}
 > {-# LANGUAGE ViewPatterns #-}
 > {-# LANGUAGE ScopedTypeVariables #-}
+> {-# LANGUAGE MultiParamTypeClasses #-}
+> {-# LANGUAGE FunctionalDependencies #-}
+> {-# LANGUAGE FlexibleInstances #-}
+> {-# LANGUAGE KindSignatures #-}
 > module Sorting where
+> import Data.Bool
 > import qualified Data.ByteString.Lazy as B
 > import Data.Foldable (foldrM)
 > import System.IO
@@ -24,21 +29,49 @@
 > --    f x y = (sin (fromIntegral x / 20) / 2 + 0.5)
 > --          * (cos (fromIntegral y / 30) / 2 + 0.5)
 
+> class Functor m => LogEq m a | m -> a where
+>     (==.), (/=.)           :: a -> a -> m Bool
 
-> le :: Ord a => a -> a -> Writer (DS.Set (a, a)) Bool
-> le x y = do
->     tell $ DS.singleton (x, y)
->     return (x < y)
+>     x /=. y               = fmap not (x ==. y)
+>     x ==. y               = fmap not (x /=. y)
+>     {-# MINIMAL (==.) | (/=.) #-}
 
-> cmp :: Ord a => a -> a -> Writer (DS.Set (a, a)) Ordering
-> cmp x y = do
->     tell $ DS.singleton (x, y)
->     return $ compare x y
+> instance Ord a => LogEq (Writer (DS.Set (a, a))) a where
+>   a ==. b = (a == b) <$ tell (DS.singleton (a, b))
 
-> qsort :: Ord a => [a] -> Writer (DS.Set (a, a)) [a]
+> class (Monad m, LogEq m a) => LogOrd (m :: * -> *) a | m -> a where
+>     logCompare              :: a -> a -> m Ordering
+>     (<.), (<=.), (>.), (>=.) :: a -> a -> m Bool
+>     logMax, logMin             :: a -> a -> m a
+
+>     logCompare x y = judge <$> (x ==. y) <*> (x <=. y) where
+>       judge True _ = EQ
+>       judge _ True = LT
+>       judge _ _ = GT
+
+>     x <.  y = (\case { LT -> True;  _ -> False }) <$> logCompare x y
+>     x <=. y = (\case { GT -> False; _ -> True }) <$> logCompare x y
+>     x >.  y = (\case { GT -> True;  _ -> False }) <$> logCompare x y
+>     x >=. y = (\case { LT -> False; _ -> True }) <$> logCompare x y
+
+>     logMax x y = bool x y <$> (x <=. y)
+>     logMin x y = bool y x <$> (x <=. y)
+>     {-# MINIMAL logCompare | (<=.) #-}
+
+
+> instance Ord a => LogOrd (Writer (DS.Set (a , a))) a where
+>   logCompare a b = compare a b <$ tell (DS.singleton (a, b))
+
+TODO: implement quick-select.
+
+ qselect' :: LogOrd w a => [a] -> w [a]
+ qselect' (middle -> Just (x, xs)) =
+ qselect' x = return x
+
+> qsort :: LogOrd w a => [a] -> w [a]
 > qsort [] = return []
 > qsort (x:xs) = do
->     cmp <- mapM (le x) xs
+>     cmp <- mapM (x <=.) xs
 >     let res = zip cmp xs
 >         low = map snd $ filter (not . fst) $ res
 >         hi  = map snd $ filter fst $ res
@@ -50,9 +83,9 @@
 > middle l = let (a,b) = splitAt (length l `div` 2) l
 >            in (fmap.fmap) (a++) $ uncons b
 
-> qsort' :: Ord a => [a] -> Writer (DS.Set (a, a)) [a]
+> qsort' :: LogOrd w a => [a] -> w [a]
 > qsort' (middle -> Just (x, xs)) = do
->     cmp <- mapM (le x) xs
+>     cmp <- mapM (x <=.) xs
 >     let res = zip cmp xs
 >         low = map snd $ filter (not . fst) $ res
 >         hi  = map snd $ filter fst $ res
@@ -62,21 +95,21 @@
 > qsort' x = return x
 
 
-> merge :: Ord a => [a] -> [a] -> Writer (DS.Set (a, a)) [a]
+> merge :: LogOrd w a => [a] -> [a] -> w [a]
 > merge [] r = return r
 > merge l [] = return l
-> merge (l:ls) (r:rs) = cmp l r >>= \case
+> merge (l:ls) (r:rs) = logCompare l r >>= \case
 >     LT -> (l:) <$> merge ls (r:rs)
 >     EQ -> ([l, r] ++) <$> merge ls rs
 >     GT -> (r:) <$> merge (l:ls) rs
 
-> insertM :: Ord a => a -> [a] -> Writer (DS.Set (a, a)) [a]
+> insertM :: LogOrd w a => a -> [a] -> w [a]
 > insertM x l = merge [x] l
 
-> isort :: Ord a => [a] -> Writer (DS.Set (a, a)) [a]
+> isort :: LogOrd w a => [a] -> w [a]
 > isort = foldrM insertM []
 
-> msort :: Ord a => [a] -> Writer (DS.Set (a, a)) [a]
+> msort :: LogOrd w a => [a] -> w [a]
 > msort [] = return []
 > msort [x] = return [x]
 > msort l = iter (map return l) where
@@ -90,11 +123,11 @@
 
 > type W a b = Writer (DS.Set (a, a)) b
 
-> minView :: Ord a => [a] -> W a (Maybe (a, [a]))
+> minView :: LogOrd w a => [a] -> w (Maybe (a, [a]))
 > minView [] = return Nothing
 > minView (x:xs) = minView xs >>= \case
 >     Nothing -> return $ Just (x, [])
->     Just (y, xs) -> cmp x y >>= return . Just . \case
+>     Just (y, xs) -> logCompare x y >>= return . Just . \case
 >         LT -> (x, y : xs)
 >         EQ -> (x, y : xs)
 >         GT -> (y, x : xs)
