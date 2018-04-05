@@ -9,6 +9,7 @@
 > import Data.Bool
 > import qualified Data.ByteString.Lazy as B
 > import Data.Foldable (foldrM)
+> import Data.Maybe
 > import System.IO
 > import Control.Arrow
 > import Control.Monad.Writer.Strict
@@ -64,9 +65,23 @@
 
 TODO: implement quick-select.
 
- qselect' :: LogOrd w a => [a] -> w [a]
- qselect' (middle -> Just (x, xs)) =
- qselect' x = return x
+> quickMedian :: LogOrd w a => [a] -> w [a]
+> quickMedian l = maybeToList <$> qselect (length l `div` 3) l
+
+> qselect :: LogOrd w a => Int -> [a] -> w (Maybe a)
+> qselect _ [] = return Nothing
+> qselect n _ | n < 0 = return Nothing
+> qselect 0 [x] = return (Just x)
+> qselect n (middle -> Just (x, xs)) = do
+> -- qselect n (x:xs) = do
+>     cmp <- mapM (x <=.) xs
+>     let res = zip cmp xs
+>         low = map snd $ filter (not . fst) $ res
+>         hi  = map snd $ filter fst $ res
+>     case compare n (length low) of
+>       LT -> qselect n low
+>       EQ -> return (Just x)
+>       GT -> qselect (n - length low) hi
 
 > qsort :: LogOrd w a => [a] -> w [a]
 > qsort [] = return []
