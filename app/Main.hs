@@ -39,6 +39,7 @@ whichAlgo = \case
   "quickselect" -> quickMedian
   "merge" -> msort
   "selection" -> selSort
+  "quickMedian" -> quickMedian
   x -> error $ "Don't know about algorithm: " ++ x
 presentation = \case
   "xy" -> (fst *** fst)
